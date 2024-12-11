@@ -13,15 +13,18 @@ import datetime as dt
 
 settlement_date = '2024-01-15'
 date = dt.datetime.strptime(settlement_date, '%Y-%m-%d').date()
-settlement_period = 1
-url = f"https://data.elexon.co.uk/bmrs/api/v1/balancing/bid-offer/all?settlementDate={settlement_date}&settlementPeriod={settlement_period}&format=csv"
 
 boas_df = pd.read_csv('data/all-boas-april2023-march2024.csv')
 
+actuals_df = pd.DataFrame()
 options_df = pd.DataFrame()
 for settlement_period in  range(1, 51):
+    url = f"https://data.elexon.co.uk/bmrs/api/v1/balancing/bid-offer/all?settlementDate={settlement_date}&settlementPeriod={settlement_period}&format=csv"
+    actuals_url =  f"https://data.elexon.co.uk/bmrs/api/v1/balancing/acceptances/all?settlementDate={settlement_date}&settlementPeriod={settlement_period}&format=csv"
     df_sp = pd.read_csv(url)
-    options_df =  pd.concat([options_df, df_sp])
+    df_act = pd.read_csv(actuals_url)
+    options_df = pd.concat([options_df, df_sp])
+    actuals_df = pd.concat([actuals_df, df_act])
     
 
 with open('data/response_1733913471428.json', 'r') as f:
@@ -71,33 +74,58 @@ result_df['end_time'] = result_df['end_time'].dt.tz_localize(local_timezone, amb
 result_df['start_time_gmt'] = result_df['start_time'].dt.tz_convert('UTC')
 result_df['end_time_gmt'] = result_df['end_time'].dt.tz_convert('UTC')
 
+result_df['start_date'] = result_df['start_time'].dt.date
+result_df = result_df[result_df['start_date'] == date] 
+
+result_df['cost'] = result_df['NET VOL (MWh)'] * result_df['AVG PRICE (GBP/MWh)']
+cost_per_hh = result_df.groupby(['MAIN SP']).sum()['cost']
+
+time_difference = pd.to_datetime(options_df['TimeTo']) - pd.to_datetime(options_df['TimeFrom'])
+options_df['duration'] = time_difference.dt.total_seconds() / 3600
+options_df['LevelDelta'] = options_df['LevelFrom'] -options_df["LevelTo"]
+options_df['net_vol'] = options_df['LevelDelta'] * options_df['duration']
+
+time_difference = pd.to_datetime(actuals_df['TimeTo']) - pd.to_datetime(actuals_df['TimeFrom'])
+actuals_df['duration'] = time_difference.dt.total_seconds() / 3600
+actuals_df['LevelDelta'] = actuals_df['LevelFrom'] -actuals_df["LevelTo"]
+actuals_df['net_vol'] = actuals_df['LevelDelta'] * actuals_df['duration']
 
 options_df['fuel_type'] = options_df['NationalGridBmUnit'].map(bmu_to_fuel_mapping)
 options_df['fuel_type'] = options_df['fuel_type'].map(fuel_type_mapping)
+actuals_df['fuel_type'] = actuals_df['NationalGridBmUnit'].map(bmu_to_fuel_mapping)
+actuals_df['fuel_type'] = actuals_df['fuel_type'].map(fuel_type_mapping)
 
-options_df['start_time'] = pd.to_datetime(options_df['TimeFrom'])
-options_df['end_time'] = pd.to_datetime(options_df['TimeTo'])
-options_df['start_time_gmt'] = options_df['start_time'].dt.tz_convert('UTC')
-options_df['end_time_gmt'] = options_df['end_time'].dt.tz_convert('UTC')
+# options_df['start_time'] = pd.to_datetime(options_df['TimeFrom'])
+# options_df['end_time'] = pd.to_datetime(options_df['TimeTo'])
+# options_df['start_time_gmt'] = options_df['start_time'].dt.tz_convert('UTC')
+# options_df['end_time_gmt'] = options_df['end_time'].dt.tz_convert('UTC')
 
 
 options_df = options_df.merge(carbon_intensity_df, on='fuel_type', how='left')
+actuals_df = actuals_df.merge(carbon_intensity_df, on='fuel_type', how='left')
 
-result_df['start_date'] = result_df['start_time'].dt.date
-result_df = result_df[result_df['start_date'] == date] 
-merged_df = pd.merge(options_df, result_df, left_on=['NationalGridBmUnit', 'SettlementPeriod'],
-                     right_on=['accepted_bmu', 'main_sp'], how='inner')
+options_df['carbon_emissions_g'] = options_df['net_vol'].fillna(0) * options_df['carbon_intensity'] * 1000
+options_df['carbon_emissions_tonnes'] = options_df['carbon_emissions_g'] / 1000000
 
-merged_df = merged_df[(merged_df['net_vol'] > 0) & (merged_df['LevelTo']>0) | (merged_df['net_vol'] < 0) & (merged_df['LevelTo'] < 0)]
+actuals_df['carbon_emissions_g'] = actuals_df['net_vol'].fillna(0) * actuals_df['carbon_intensity'] * 1000
+actuals_df['carbon_emissions_tonnes'] = actuals_df['carbon_emissions_g'] / 1000000
 
-# Add a column 'match_flag' which will contain 1 if both conditions match, otherwise 0
-merged_df['accepted'] = 1
-options_df = pd.merge(options_df, merged_df[['SettlementDate', 'SettlementPeriod', 'accepted', 'net_vol', 'NationalGridBmUnit']], 
-                       on=['NationalGridBmUnit', 'SettlementPeriod'], how='left')
-options_df['accepted'].fillna(0, inplace=True)
 
-# Convert match_flag to integer
-options_df['accepted'] = options_df['accepted'].astype(int)
+
+
+# merged_df = pd.merge(options_df, result_df, left_on=['NationalGridBmUnit', 'SettlementPeriod'],
+#                      right_on=['accepted_bmu', 'main_sp'], how='inner')
+
+# merged_df = merged_df[(merged_df['net_vol'] > 0) & (merged_df['LevelTo']>0) | (merged_df['net_vol'] < 0) & (merged_df['LevelTo'] < 0)]
+
+# # Add a column 'match_flag' which will contain 1 if both conditions match, otherwise 0
+# merged_df['accepted'] = 1
+# options_df = pd.merge(options_df, merged_df[['SettlementDate', 'SettlementPeriod', 'accepted', 'net_vol', 'NationalGridBmUnit']], 
+#                        on=['NationalGridBmUnit', 'SettlementPeriod'], how='left')
+# options_df['accepted'].fillna(0, inplace=True)
+
+# # Convert match_flag to integer
+# options_df['accepted'] = options_df['accepted'].astype(int)
 
 # df = df.rename(columns=dict(zip(result_df.columns.to_list(), [x.lower().replace(' ', '_').split('_(')[0] for x in result_df.columns.to_list()])))
 
