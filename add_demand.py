@@ -13,6 +13,6 @@ def add_demand(boas_data):
     boas_data["date"] = pd.to_datetime(boas_data['start_time']).dt.date
 
     # Add on demand by summing volume across each settlement period within each day
-    boas_data["demand"] = boas_data[boas_data["accepted"]==1].groupby(["main_sp", "date"] )["net_vol_mwh"].transform("sum")
+    boas_data["demand"] = boas_data[boas_data["accepted"]==1].groupby(["main_sp", "date"] )["net_vol"].transform("sum")
 
     return(boas_data)

@@ -1,4 +1,5 @@
 import pandas as pd
+from add_demand import add_demand
 from ranking_methods import RankingMethod
 
 
@@ -12,7 +13,7 @@ class BmuRanking:
     def _get_all_boas_df(self, boa_df: pd.DataFrame):
         cleaned_boa_df= boa_df.copy()
         cleaned_boa_df["start_time"] = pd.to_datetime(cleaned_boa_df["start_time"])
-        # cleaned_boa_df = add_demand(cleaned_boa_df)
+        cleaned_boa_df = add_demand(cleaned_boa_df)
         return cleaned_boa_df
 
 
@@ -32,8 +33,8 @@ class BmuRanking:
             ranked_df = self.order_df_by_column(boas_with_carbon_adjusted_cost, "carbon_adjusted_cost_pounds_per_mwh")
         
         ranked_df["cumulative_demand"] = ranked_df.groupby("start_time_gmt", as_index=False)["net_vol"].cumsum()
-        ranked_df["required_bmu"] = ranked_df["cumulative_demand"] <= ranked_df["required_demand"]
-        return ranked_df.loc[ranked_df["required_bmu"] is True]
+        ranked_df["required_bmu"] = ranked_df["cumulative_demand"] <= ranked_df["demand"]
+        return ranked_df.loc[ranked_df["required_bmu"] == True]
 
     def order_df_by_column(self, df:pd.DataFrame, column_name: str, ascending:bool=True) -> pd.DataFrame:
         return df.sort_values(["start_time_gmt", column_name], ascending=[True, ascending])
