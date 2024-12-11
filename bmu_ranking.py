@@ -12,7 +12,7 @@ class BmuRanking:
     
     def _get_all_boas_df(self, boa_df: pd.DataFrame):
         cleaned_boa_df= boa_df.copy()
-        cleaned_boa_df["start_time"] = pd.to_datetime(cleaned_boa_df["start_time"])
+        cleaned_boa_df["start_time_gmt"] = pd.to_datetime(cleaned_boa_df["start_time_gmt"])
         cleaned_boa_df = add_demand(cleaned_boa_df)
         return cleaned_boa_df
 
