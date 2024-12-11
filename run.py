@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from app.components.graph_plotting_functions import plot_emissions_over_time
 
 
