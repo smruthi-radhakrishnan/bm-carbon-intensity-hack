@@ -49,8 +49,6 @@ def main():
         'HYDRO': 'Hydro',
         'OIL': 'Oil'
     }
-    boas_df['fuel_type'] = boas_df['ACCEPTED BMU'].map(fuel_type_mapping)
-    alternative_boa_df['fuel_type'] = alternative_boa_df['ALTERNATIVE BMU'].map(fuel_type_mapping)
     
     merged_df = pd.merge(boas_df, alternative_boa_df, on=['BOA REF', 'ACCEPTED BMU'], how='inner')
     
@@ -88,14 +86,15 @@ def main():
     all_boas = result_df
     all_boas['start_time'] = pd.to_datetime(all_boas['accept_time']) + pd.to_timedelta(all_boas['time_to_target'], unit='m')
     all_boas['end_time'] = pd.to_datetime(all_boas['start_time']) + pd.to_timedelta(all_boas['target_duration'], unit='m')
-
+    
     local_timezone = 'Europe/London'
     all_boas['start_time'] = all_boas['start_time'].dt.tz_localize(local_timezone, ambiguous=True)
     all_boas['end_time'] = all_boas['end_time'].dt.tz_localize(local_timezone, ambiguous=True)
-
+    
     all_boas['start_time_gmt'] = all_boas['start_time'].dt.tz_convert('UTC')
     all_boas['end_time_gmt'] = all_boas['end_time'].dt.tz_convert('UTC')
-
+    
+    all_boas = all_boas.dropna(subset='fuel_type')
     # Optional: Save results to CSV
     all_boas.to_parquet('data/carbon_emissions_results.parquet', index=False)
     
