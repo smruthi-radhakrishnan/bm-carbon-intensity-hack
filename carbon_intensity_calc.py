@@ -56,7 +56,11 @@ def main():
     merged_df['NET VOL (MWh)'] = merged_df['NET VOL (MWh)'] + merged_df['APPROX ALTERNATIVE VOL (MWh)']
     
     merged_df['ACCEPTED BMU'] = merged_df['ALTERNATIVE BMU_y']
-    merged_df['fuel_type'] = merged_df['fuel_type_y']
+    merged_df.loc[merged_df['fuel_type_x'].isna(), 'fuel_type'] = merged_df['fuel_type_y']
+
+    # For rows where 'fuel_type' is not NaN, assign 'fuel_type_x'
+    merged_df.loc[merged_df['fuel_type_x'].notna(), 'fuel_type'] = merged_df['fuel_type_x']
+
     merged_df['ALTERNATIVE BMU'] = np.nan
     
     merged_df = merged_df[boas_df.columns.to_list()]
@@ -65,6 +69,7 @@ def main():
     boas_df['accepted'] = 1
     
     result_df = pd.concat([merged_df, boas_df])
+    result_df['fuel_type'] = result_df['fuel_type'].map(fuel_type_mapping)
     
     # 5. Merge with carbon intensity data and calculate emissions
     result_df = result_df.merge(carbon_intensity_df, on='fuel_type', how='left')
