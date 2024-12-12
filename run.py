@@ -39,7 +39,7 @@ def run_app():
         hide_index=True,
     )
 
-    col6.metric(label="Cost of CO₂ savings", value=table_list[1])
+    col6.metric(label="Cost of CO₂ savings", value=str(table_list[1]) + " £/tCO₂")
 
     if ranking_mode == "Emissions-Adjusted Cost":
         co_cost = st.slider(
