@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import datetime as dt
 from app.components.graph_plotting_functions import (
     plot_emissions_over_time,
     plot_cost_over_time,
@@ -19,6 +20,9 @@ def run_app():
     co_cost = 0.0
 
     all_boas_df = pd.read_parquet("data/carbon_emissions_results.parquet")
+    all_boas_df = all_boas_df[
+        all_boas_df["start_time_gmt"].dt.date == dt.date(2023, 10, 7)
+    ]
     bmu_ranking_class_original = BmuRanking(
         all_boas_df, RankingMethod(ranking_mode), 0.0
     )
@@ -27,6 +31,9 @@ def run_app():
     )
 
     adjusted_costs_df = bmu_ranking_class_adjusted.ranked_bmu_df
+    adjusted_costs_df["total_cost_pounds"] = (
+        adjusted_costs_df["total_cost_pounds"] * 1.2
+    )
     original_costs_df = bmu_ranking_class_original.ranked_bmu_df
 
     col5, col6 = st.columns(2)
