@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import html
 
 
 # SP = Settling Period
@@ -11,7 +12,7 @@ def plot_emissions_over_time(
     title="Baseline CO₂ emissions over time (tonnes)",
     y_label="CO₂ (tonnes)",
     x_label="Settlement period start time (GMT)",
-    line_colour="#FF0000",
+    line_colour="#B53737",
 ):
     emissions_per_sp = output_df.groupby("start_time_gmt", as_index=False)[
         "carbon_emissions_tonnes"
@@ -22,6 +23,7 @@ def plot_emissions_over_time(
     fig.update_yaxes(title=y_label)
     if axis_max:
         fig.update_yaxes(range=(axis_min, axis_max))
+    fig.update_traces(line=dict(color=line_colour), mode="lines")
     return fig
 
 
@@ -54,20 +56,34 @@ def summary_table(original_df=None, adjusted_df=None):
         str((original_df["total_cost_pounds"].sum() / 1000000).round(1)) + "M"
     )
     adjusted_cost = (
-        str((adjusted_df["total_cost_pounds"].sum().round(2) / 1000000).round(1)) + "M"
+        str((adjusted_df["total_cost_pounds"].sum().round(1) / 1000000).round(1)) + "M"
     )
 
-    original_carbon = str(original_df["carbon_emissions_tonnes"].sum())
-    adjusted_carbon = str(adjusted_df["carbon_emissions_tonnes"].sum())
+    cost_diff = (
+        str(
+            (
+                (
+                    adjusted_df["total_cost_pounds"].sum()
+                    - original_df["total_cost_pounds"].sum()
+                ).round(2)
+                / 1000000
+            ).round(1)
+        )
+        + "M"
+    )
+
+    original_carbon = original_df["carbon_emissions_tonnes"].sum()
+    adjusted_carbon = adjusted_df["carbon_emissions_tonnes"].sum()
 
     data = {
-        "": ["Cost (£)", "CO₂ (tonnes)"],
+        "Type": ["Cost (£)", "CO₂ (tonnes)"],
         "Baseline": [original_cost, original_carbon],
         "Emissions-adjusted": [adjusted_cost, adjusted_carbon],
+        "Abs diff": [cost_diff, original_carbon - adjusted_carbon],
     }
-    df = pd.DataFrame(data=data)
-    df = df.reset_index(drop=True)
 
-    return st.table(
-        data=df,
-    )
+    carbon_cost = (
+        adjusted_df["total_cost_pounds"].sum() - original_df["total_cost_pounds"].sum()
+    ) / (original_carbon - adjusted_carbon)
+
+    return [data, carbon_cost]
